@@ -18,8 +18,8 @@ bool ADS1220::Init() noexcept
     HAL_Delay(10);
 
     const std::array<uint8_t, kRegisterCount> configuration{
-        kPressureRegister0,
-        0x00, // Normal mode, 20 samples per second, single-shot conversion
+        kPressureRegister0, // pressure channel
+        0b11010100, // Turbo mode, continuous conversion, 2000 sps = 2kHz
         0x40, // External reference on REFP0/REFN0
         0x00, // Dedicated active-low DRDY output enabled
     };
@@ -57,7 +57,6 @@ std::optional<ADS1220::Measurement> ADS1220::ReadMeasurement() noexcept
     }
 
     dataReady_             = false;
-    measurementInProgress_ = false;
 
     const auto adcValue = ReadConversion();
     if (not adcValue.has_value()) {
@@ -104,16 +103,13 @@ bool ADS1220::WriteRegisters(uint8_t firstRegister, const uint8_t* data, uint8_t
 
 std::optional<int32_t> ADS1220::ReadConversion() noexcept
 {
-    uint8_t command = kReadDataCommand;
     std::array<uint8_t, kConversionByteCount> data{};
 
     Select();
-    const HAL_StatusTypeDef commandStatus = HAL_SPI_Transmit(&spi_, &command, 1, HAL_MAX_DELAY);
-    const HAL_StatusTypeDef dataStatus =
-        commandStatus == HAL_OK ? HAL_SPI_Receive(&spi_, data.data(), data.size(), HAL_MAX_DELAY) : HAL_ERROR;
+    const HAL_StatusTypeDef dataStatus = HAL_OK ? HAL_SPI_Receive(&spi_, data.data(), data.size(), HAL_MAX_DELAY) : HAL_ERROR;
     Deselect();
 
-    if (commandStatus != HAL_OK or dataStatus != HAL_OK) {
+    if (dataStatus != HAL_OK) {
         return std::nullopt;
     }
 
