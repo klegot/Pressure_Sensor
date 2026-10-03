@@ -8,7 +8,7 @@
 #include "ADS1220.hpp"
 #include "pressure_processing.hpp"
 
-constexpr uint32_t kTransmitPeriodMs = 5;
+constexpr uint32_t kTransmitPeriodMs = 10;
 
 constinit hydrv::GPIO::GPIOLow rx_pin(hydrv::GPIO::GPIOLow::GPIOA_port, 10, hydrv::GPIO::GPIOLow::GPIO_UART_RX);
 
@@ -40,6 +40,11 @@ PressureProcessor pressureProcessor;
 uint64_t depth = 0;
 uint64_t avg_depth = 0;
 uint64_t depth_sum = 0;
+uint64_t depthMll;
+uint64_t atmosphere;
+uint64_t pascals;
+uint64_t voltage;
+
 
 constexpr int kDepthBusAddress = 0;
 
@@ -57,6 +62,7 @@ int main(void)
     MX_GPIO_Init();
     MX_SPI1_Init();
     MX_CAN_Init();
+    HAL_Delay(100); // задержка чтобы АЦП успел раздуплиться после подачи питания
 
     rs485.Init();
     if (not externalAdc.Init()) {
@@ -80,16 +86,20 @@ int main(void)
 
                 if (pressureProcessor.Process(measurement->adcValue)) {
                     const auto depthMicrometers = pressureProcessor.DepthMicrometers();
+                    pascals = pressureProcessor.PressureMilliPascals().value(); // отладочная инфа
+                    atmosphere = pressureProcessor.AtmosphericMilliPascals().value(); // отладочная инфа
+                    depthMll = pressureProcessor.DepthMillimeters().value(); // отладочная инфа
+                    //voltage = pressureProcessor.VoltageMillivolts().value();
                     if (depthMicrometers.has_value()) {
                         depth = depthMicrometers.value();
-                        if (k < 20)
+                        if (k < 10) // децимация для 100 Гц даты
                         {
                             depth_sum += depth;
                             k++;
                         }
                         else
                         {
-                            avg_depth = depth_sum / 20;
+                            avg_depth = depth_sum / 10;
                             depth_sum = 0;
                             k = 0;
                         }
@@ -136,11 +146,11 @@ void SystemClock_Config(void)
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
         Error_Handler();
     }
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+    /*PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
     PeriphClkInit.AdcClockSelection    = RCC_ADCPCLK2_DIV6;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
         Error_Handler();
-    }
+    }*/
 }
 
 static void MX_CAN_Init(void)

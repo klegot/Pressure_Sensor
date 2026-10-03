@@ -19,7 +19,7 @@ bool ADS1220::Init() noexcept
 
     const std::array<uint8_t, kRegisterCount> configuration{
         kPressureRegister0, // pressure channel
-        0b11010100, // Turbo mode, continuous conversion, 2000 sps = 2kHz
+        0b11000100, // Normal mode, continuous conversion, 1000 sps = 1kHz
         0x40, // External reference on REFP0/REFN0
         0x00, // Dedicated active-low DRDY output enabled
     };
@@ -106,7 +106,8 @@ std::optional<int32_t> ADS1220::ReadConversion() noexcept
     std::array<uint8_t, kConversionByteCount> data{};
 
     Select();
-    const HAL_StatusTypeDef dataStatus = HAL_OK ? HAL_SPI_Receive(&spi_, data.data(), data.size(), HAL_MAX_DELAY) : HAL_ERROR;
+    //const HAL_StatusTypeDef dataStatus = HAL_OK ? HAL_SPI_Receive(&spi_, data.data(), data.size(), HAL_MAX_DELAY) : HAL_ERROR;
+    const HAL_StatusTypeDef dataStatus = HAL_SPI_Receive(&spi_, data.data(), data.size(), HAL_MAX_DELAY);
     Deselect();
 
     if (dataStatus != HAL_OK) {
